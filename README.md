@@ -4,12 +4,9 @@ Aplikasi pencatatan penjualan sederhana yang berjalan sepenuhnya di browser
 dalam satu file HTML, tanpa backend dan tanpa instalasi. Data disimpan di
 database SQLite (sql.js / WebAssembly) dan tersimpan secara lokal di browser.
 
-![screenshot](Screenshot_app/Screenshot2026-11-15-222224.png)
-![screenshot](Screenshot_app/Screenshot2026-11-15-222318.png)
-![screenshot](Screenshot_app/Screenshot2026-11-15-222328.png)
 <img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="50%" alt="Deskripsi gambar">
-
-
+<img src="Screenshot_app/Screenshot2026-11-15-222318.png" width="50%" alt="Deskripsi gambar">
+<img src="Screenshot_app/Screenshot2026-11-15-222328.png" width="50%" alt="Deskripsi gambar">
 
 ## Fitur
 - 📦 **Data Barang** – tambah, edit, hapus barang, dengan indikator stok menipis/habis
