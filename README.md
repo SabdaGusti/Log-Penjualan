@@ -7,9 +7,9 @@ database SQLite (sql.js / WebAssembly) dan tersimpan secara lokal di browser.
 https://sabdagusti.github.io/Log-Penjualan/
 
 <p align=center>
-  <img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="500" >
-  <img src="Screenshot_app/Screenshot2026-11-15-222318.png" width="500" >
-  <img src="Screenshot_app/Screenshot2026-11-15-222328.png" width="500" >
+  <img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="450" >
+  <img src="Screenshot_app/Screenshot2026-11-15-222318.png" width="450" >
+  <img src="Screenshot_app/Screenshot2026-11-15-222328.png" width="450" >
 </p>
 
 ## Fitur
