@@ -7,6 +7,8 @@ database SQLite (sql.js / WebAssembly) dan tersimpan secara lokal di browser.
 ![screenshot](Screenshot_app/Screenshot2026-11-15-222224.png)
 ![screenshot](Screenshot_app/Screenshot2026-11-15-222318.png)
 ![screenshot](Screenshot_app/Screenshot2026-11-15-222328.png)
+<img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="50%" alt="Deskripsi gambar">
+
 
 
 ## Fitur
