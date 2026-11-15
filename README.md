@@ -4,10 +4,10 @@ Aplikasi pencatatan penjualan sederhana yang berjalan sepenuhnya di browser
 dalam satu file HTML, tanpa backend dan tanpa instalasi. Data disimpan di
 database SQLite (sql.js / WebAssembly) dan tersimpan secara lokal di browser.
 
-<p align=left>
-  <img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="50%" alt="Deskripsi gambar">
-  <img src="Screenshot_app/Screenshot2026-11-15-222318.png" width="50%" alt="Deskripsi gambar">
-  <img src="Screenshot_app/Screenshot2026-11-15-222328.png" width="50%" alt="Deskripsi gambar">
+<p align=center>
+  <img src="Screenshot_app/Screenshot2026-11-15-222224.png" width="200" >
+  <img src="Screenshot_app/Screenshot2026-11-15-222318.png" width="200" >
+  <img src="Screenshot_app/Screenshot2026-11-15-222328.png" width="200" >
 </p>
 
 ## Fitur
