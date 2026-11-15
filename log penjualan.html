@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>App Penjualan — SQLite</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:       #080e1a;
+  --surface:  #0f1829;
+  --card:     #131f33;
+  --border:   #1e2d47;
+  --border2:  #243550;
+  --text:     #e2eaf7;
+  --muted:    #6b82a8;
+  --dim:      #3d5275;
+  --primary:  #3b82f6;
+  --primary2: #1d4ed8;
+  --ok:       #10b981;
+  --warn:     #f59e0b;
+  --danger:   #ef4444;
+  --mono:     'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 600; font-size: 15px; letter-spacing: -.2px;
+}
+.topbar-brand .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+}
+.topbar-right { display: flex; gap: 8px; align-items: center; }
+
+.main { padding: 20px 24px; max-width: 1400px; margin: auto; width: 100%; }
+
+/* ── KPI ── */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.kpi-value { font-size: 22px; font-weight: 600; }
+.kpi-value.green { color: var(--ok); }
+.kpi-value.blue  { color: var(--primary); }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab {
+  padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent; font-size: 13px; font-weight: 500;
+  color: var(--muted); background: transparent; transition: all .15s;
+}
+.tab.active { background: var(--primary); color: #fff; border-color: var(--primary2); }
+.tab:not(.active):hover { background: var(--card); border-color: var(--border); color: var(--text); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── GRID ── */
+.two-col { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.card-body { padding: 16px 18px; }
+
+/* ── FORM ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+input, select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color .15s;
+  width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--primary); }
+input[readonly] { color: var(--muted); cursor: default; }
+.form-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ── BUTTONS ── */
+btn, .btn, .btn-ghost, .btn-danger, .btn-ok, .btn-warn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; border-radius: 8px; padding: 8px 14px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  font-family: inherit; transition: opacity .15s, transform .1s;
+  text-decoration: none; white-space: nowrap;
+}
+.btn       { background: var(--primary);  color: #fff; }
+.btn-ok    { background: var(--ok);       color: #fff; }
+.btn-danger{ background: var(--danger);   color: #fff; }
+.btn-warn  { background: var(--warn);     color: #000; }
+.btn-ghost { background: var(--surface);  color: var(--text); border: 1px solid var(--border); }
+.btn:hover, .btn-ok:hover, .btn-danger:hover, .btn-warn:hover { opacity: .85; }
+.btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+button { cursor: pointer; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(59,130,246,.04); }
+tfoot td { padding: 10px 12px; font-weight: 600; border-top: 1px solid var(--border2); }
+
+/* ── BADGES ── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500;
+}
+.badge-red   { background: rgba(239,68,68,.12);  color: #fca5a5; }
+.badge-yellow{ background: rgba(245,158,11,.12); color: #fcd34d; }
+.badge-green { background: rgba(16,185,129,.12); color: #6ee7b7; }
+
+/* ── MODAL ── */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; z-index: 100;
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  padding: 28px;
+  max-width: 400px; width: 92%;
+  text-align: center;
+}
+.modal-icon  { font-size: 40px; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.modal-msg   { color: var(--muted); font-size: 13px; white-space: pre-line; margin-bottom: 22px; line-height: 1.6; }
+.modal-btns  { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* ── SQL CONSOLE ── */
+.sql-editor {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ok);
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.sql-result {
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre;
+  line-height: 1.6;
+}
+.sql-result.error { color: var(--danger); }
+
+/* ── MISC ── */
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+.loading { text-align: center; padding: 60px; color: var(--muted); }
+.chip { padding: 2px 8px; border-radius: 6px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-family: var(--mono); }
+.profit-pos { color: var(--ok); }
+.profit-neg { color: var(--danger); }
+.divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="dot"></div>
+    App Penjualan <span class="chip">SQLite</span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-ghost btn-sm" onclick="exportDB()">⬇ Export DB</button>
+    <button class="btn-ghost btn-sm" onclick="importDB()"><input type="file" id="importFile" accept=".db" style="display:none" onchange="doImport(event)">📂 Import DB</button>
+    <button class="btn-danger btn-sm" onclick="confirmReset()">🗑 Reset Semua</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainArea">
+  <div class="loading">⏳ Memuat SQLite...</div>
+</div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-icon"  id="mIcon">⚠️</div>
+    <div class="modal-title" id="mTitle">-</div>
+    <div class="modal-msg"   id="mMsg">-</div>
+    <div class="modal-btns"  id="mBtns"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════════
+function modal(icon, title, msg, btns) {
+  document.getElementById('mIcon').textContent  = icon;
+  document.getElementById('mTitle').textContent = title;
+  document.getElementById('mMsg').textContent   = msg;
+  const el = document.getElementById('mBtns');
+  el.innerHTML = '';
+  (btns || [{label:'OK'}]).forEach(b => {
+    const btn = document.createElement('button');
+    btn.className   = b.cls || 'btn';
+    btn.textContent = b.label;
+    btn.onclick = () => { closeModal(); if(b.fn) b.fn(); };
+    el.appendChild(btn);
+  });
+  document.getElementById('modalBackdrop').classList.add('show');
+}
+function closeModal() { document.getElementById('modalBackdrop').classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════
+//  FORMAT
+// ═══════════════════════════════════════════════════════
+const rp  = n => 'Rp ' + Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const fmt = n => Number(n || 0).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+// ═══════════════════════════════════════════════════════
+//  SQLITE INIT
+// ═══════════════════════════════════════════════════════
+let DB = null;
+
+async function initSQLite() {
+  const SQL = await initSqlJs({
+    locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`
+  });
+
+  // Load saved DB from localStorage jika ada
+  const saved = localStorage.getItem('appdb_bin');
+  if (saved) {
+    const bin = Uint8Array.from(atob(saved), c => c.charCodeAt(0));
+    DB = new SQL.Database(bin);
+  } else {
+    DB = new SQL.Database();
+  }
+
+  // Buat tabel jika belum ada
+  DB.run(`
+    CREATE TABLE IF NOT EXISTS barang (
+      kode      TEXT PRIMARY KEY,
+      nama      TEXT NOT NULL,
+      harga_beli REAL NOT NULL DEFAULT 0,
+      stok      INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS transaksi (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      tanggal   TEXT NOT NULL,
+      kode      TEXT NOT NULL,
+      nama      TEXT NOT NULL,
+      qty       INTEGER NOT NULL,
+      harga_jual REAL NOT NULL,
+      profit    REAL NOT NULL,
+      FOREIGN KEY (kode) REFERENCES barang(kode)
+    );
+  `);
+
+  saveDB();
+  renderApp();
+}
+
+// ═══════════════════════════════════════════════════════
+//  DB HELPERS
+// ═══════════════════════════════════════════════════════
+function saveDB() {
+  const bin = DB.export();
+  const b64 = btoa(String.fromCharCode(...bin));
+  localStorage.setItem('appdb_bin', b64);
+}
+
+function query(sql, params = []) {
+  try {
+    const stmt = DB.prepare(sql);
+    stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    stmt.free();
+    return { ok: true, rows };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function run(sql, params = []) {
+  try {
+    DB.run(sql, params);
+    saveDB();
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  GENERATE KODE
+// ═══════════════════════════════════════════════════════
+function generateKode() {
+  const r = query(`SELECT kode FROM barang ORDER BY kode DESC LIMIT 1`);
+  if (!r.ok || r.rows.length === 0) return 'BRG-001';
+  const last = r.rows[0].kode;
+  const num  = parseInt(last.replace('BRG-', '')) || 0;
+  return 'BRG-' + String(num + 1).padStart(3, '0');
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER APP
+// ═══════════════════════════════════════════════════════
+function renderApp() {
+  document.getElementById('mainArea').innerHTML = `
+    <!-- KPI -->
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('barang', this)">📦 Data Barang</button>
+      <button class="tab" onclick="switchTab('transaksi', this)">🔁 Transaksi</button>
+      <button class="tab" onclick="switchTab('laporan', this)">📊 Laporan</button>
+      <button class="tab" onclick="switchTab('sql', this)">🖥 SQL Console</button>
+    </div>
+
+    <!-- TAB: BARANG -->
+    <div class="tab-panel active" id="tab-barang">
+      <div class="two-col">
+        <!-- FORM BARANG -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">➕ Tambah / Edit Barang</div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Kode Barang</label>
+                <input id="b_kode" readonly>
+              </div>
+              <div class="form-group">
+                <label>Nama Barang</label>
+                <input id="b_nama" placeholder="cth: Apel Merah">
+              </div>
+              <div class="form-group">
+                <label>Harga Beli (Rp)</label>
+                <input id="b_harga" type="number" step="0.01" placeholder="0">
+                <span style="font-size:11px;color:var(--muted)">Bisa pakai desimal, cth: 1500.50</span>
+              </div>
+              <div class="form-group">
+                <label>Stok Awal / Tambah</label>
+                <input id="b_stok" type="number" placeholder="0">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveBarang()">💾 Simpan</button>
+              <button class="btn-ghost" onclick="resetFormBarang()">Reset</button>
+            </div>
+            <!-- SQL Preview -->
+            <hr class="divider">
+            <label>SQL yang akan dieksekusi</label>
+            <div id="sqlPreviewBarang" class="sql-result" style="min-height:40px;margin-top:8px;font-size:11px;color:var(--muted)">—</div>
+          </div>
+        </div>
+
+        <!-- TABEL BARANG -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📦 Daftar Barang</div>
+            <input placeholder="🔍 Cari nama/kode..." style="width:180px;padding:6px 10px;font-size:12px" oninput="renderBarang(this.value)">
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kode</th><th>Nama</th><th>Stok</th><th>Harga Beli</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tblBarang"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: TRANSAKSI -->
+    <div class="tab-panel" id="tab-transaksi">
+      <div class="two-col">
+        <!-- FORM TRANSAKSI -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🛒 Buat Transaksi</div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group full">
+                <label>Pilih Barang</label>
+                <select id="t_kode" onchange="onBarangSelect()"></select>
+              </div>
+              <div class="form-group">
+                <label>Qty</label>
+                <input id="t_qty" type="number" placeholder="0" min="1" oninput="updateSqlPreviewTransaksi()">
+              </div>
+              <div class="form-group">
+                <label>Harga Jual (Rp)</label>
+                <input id="t_harga" type="number" step="0.01" placeholder="0" oninput="updateSqlPreviewTransaksi()">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" onclick="addToCart()">+ Tambah ke Cart</button>
+            </div>
+
+            <hr class="divider">
+            <div class="card-title" style="margin-bottom:10px">🧾 Cart</div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Nama</th><th>Qty</th><th>Harga</th><th>Sub</th><th></th></tr></thead>
+                <tbody id="tblCart"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="3" style="text-align:right;color:var(--muted)">Total</td>
+                    <td id="cartTotal" style="color:var(--ok)">Rp 0</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div class="form-actions" style="margin-top:12px">
+              <button class="btn-ok" onclick="konfirmasiTransaksi()">✅ Proses Transaksi</button>
+              <button class="btn-ghost" onclick="clearCart()">🗑 Kosongkan</button>
+            </div>
+
+            <!-- SQL Preview Transaksi -->
+            <hr class="divider">
+            <label>SQL yang akan dieksekusi</label>
+            <div id="sqlPreviewTransaksi" class="sql-result" style="min-height:40px;margin-top:8px;font-size:11px;color:var(--muted)">—</div>
+          </div>
+        </div>
+
+        <!-- RIWAYAT TRANSAKSI -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 Riwayat Transaksi</div>
+            <div class="row">
+              <input type="date" id="f_from" style="width:130px;font-size:12px">
+              <input type="date" id="f_to"   style="width:130px;font-size:12px">
+              <button class="btn-ghost btn-sm" onclick="renderTransaksi()">Filter</button>
+              <button class="btn-ghost btn-sm" onclick="exportCSV()">⬇ CSV</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr><th>Tgl</th><th>Kode</th><th>Nama</th><th>Qty</th><th>Harga Jual</th><th>Profit</th><th>Aksi</th></tr>
+              </thead>
+              <tbody id="tblTransaksi"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LAPORAN -->
+    <div class="tab-panel" id="tab-laporan">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📊 Laporan Ringkas</div>
+          <div class="row">
+            <input type="date" id="lp_from" style="width:130px;font-size:12px">
+            <input type="date" id="lp_to"   style="width:130px;font-size:12px">
+            <button class="btn btn-sm" onclick="renderLaporan()">Tampilkan</button>
+          </div>
+        </div>
+        <div class="card-body" id="laporanBody">
+          <div class="empty">Pilih rentang tanggal lalu klik Tampilkan</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SQL CONSOLE -->
+    <div class="tab-panel" id="tab-sql">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🖥 SQL Console</div>
+          <div class="row">
+            <button class="btn-ghost btn-sm" onclick="setSqlTemplate('SELECT * FROM barang;')">barang</button>
+            <button class="btn-ghost btn-sm" onclick="setSqlTemplate('SELECT * FROM transaksi ORDER BY id DESC;')">transaksi</button>
+            <button class="btn-ghost btn-sm" onclick="setSqlTemplate('SELECT kode, nama, SUM(qty) as total_terjual, SUM(profit) as total_profit FROM transaksi GROUP BY kode;')">summary</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <label>Query SQL</label>
+          <textarea id="sqlInput" class="sql-editor" placeholder="SELECT * FROM barang;"></textarea>
+          <div class="form-actions">
+            <button class="btn" onclick="runSQL()">▶ Jalankan</button>
+            <button class="btn-ghost" onclick="document.getElementById('sqlResult').textContent=''; document.getElementById('sqlResult').className='sql-result'">Clear</button>
+          </div>
+          <div id="sqlResult" class="sql-result" style="margin-top:12px">— Hasil query akan muncul di sini —</div>
+        </div>
+      </div>
+
+      <!-- Schema Info -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-header"><div class="card-title">📐 Schema Database</div></div>
+        <div class="card-body">
+          <div class="sql-result" style="color:var(--muted)">-- Tabel: barang
+CREATE TABLE barang (
+  kode       TEXT PRIMARY KEY,    -- contoh: BRG-001
+  nama       TEXT NOT NULL,
+  harga_beli REAL NOT NULL DEFAULT 0,
+  stok       INTEGER NOT NULL DEFAULT 0
+);
+
+-- Tabel: transaksi
+CREATE TABLE transaksi (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  tanggal    TEXT NOT NULL,        -- format: YYYY-MM-DD
+  kode       TEXT NOT NULL,
+  nama       TEXT NOT NULL,
+  qty        INTEGER NOT NULL,
+  harga_jual REAL NOT NULL,
+  profit     REAL NOT NULL,
+  FOREIGN KEY (kode) REFERENCES barang(kode)
+);</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  resetFormBarang();
+  renderBarang();
+  renderTransaksi();
+  renderKPI();
+  renderDropdown();
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  KPI
+// ═══════════════════════════════════════════════════════
+function renderKPI() {
+  const rJenis  = query(`SELECT COUNT(*) as n FROM barang`);
+  const rStok   = query(`SELECT COALESCE(SUM(stok), 0) as n FROM barang`);
+  const rTrx    = query(`SELECT COUNT(*) as n FROM transaksi`);
+  const rProfit = query(`SELECT COALESCE(SUM(profit), 0) as n FROM transaksi`);
+
+  const jenis  = rJenis.rows[0]?.n  || 0;
+  const stok   = rStok.rows[0]?.n   || 0;
+  const trx    = rTrx.rows[0]?.n    || 0;
+  const profit = rProfit.rows[0]?.n || 0;
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Jenis Barang</div><div class="kpi-value blue">${fmt(jenis)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Stok</div><div class="kpi-value">${fmt(stok)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Transaksi</div><div class="kpi-value">${fmt(trx)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Profit</div><div class="kpi-value green">${rp(profit)}</div></div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+//  BARANG
+// ═══════════════════════════════════════════════════════
+function resetFormBarang() {
+  const kode = generateKode();
+  document.getElementById('b_kode').value  = kode;
+  document.getElementById('b_nama').value  = '';
+  document.getElementById('b_harga').value = '';
+  document.getElementById('b_stok').value  = '';
+  updateSqlPreviewBarang();
+}
+
+function updateSqlPreviewBarang() {
+  const kode  = document.getElementById('b_kode')?.value  || '?';
+  const nama  = document.getElementById('b_nama')?.value  || '?';
+  const harga = document.getElementById('b_harga')?.value || '0';
+  const stok  = document.getElementById('b_stok')?.value  || '0';
+  const el    = document.getElementById('sqlPreviewBarang');
+  if (!el) return;
+  // cek apakah edit atau insert
+  const exists = query(`SELECT 1 FROM barang WHERE kode=?`, [kode]);
+  if (exists.ok && exists.rows.length > 0) {
+    el.textContent = `UPDATE barang\n  SET nama='${nama}', harga_beli=${harga}, stok=stok+${stok}\n  WHERE kode='${kode}';`;
+  } else {
+    el.textContent = `INSERT INTO barang (kode, nama, harga_beli, stok)\n  VALUES ('${kode}', '${nama}', ${harga}, ${stok});`;
+  }
+}
+
+['b_nama','b_harga','b_stok'].forEach(id => {
+  document.addEventListener('input', e => { if(e.target.id === id) updateSqlPreviewBarang(); });
+});
+
+function saveBarang() {
+  const kode  = document.getElementById('b_kode').value.trim();
+  const nama  = document.getElementById('b_nama').value.trim();
+  const harga = parseFloat(document.getElementById('b_harga').value) || 0;
+  const stok  = parseInt(document.getElementById('b_stok').value)  || 0;
+
+  if (!nama) { modal('⚠️','Perhatian','Nama barang wajib diisi.',[{label:'OK'}]); return; }
+  if (harga <= 0) { modal('⚠️','Perhatian','Harga beli harus lebih dari 0.',[{label:'OK'}]); return; }
+
+  const exists = query(`SELECT 1 FROM barang WHERE kode=?`, [kode]);
+  let res;
+  if (exists.ok && exists.rows.length > 0) {
+    res = run(`UPDATE barang SET nama=?, harga_beli=?, stok=MAX(0, stok+?) WHERE kode=?`, [nama, harga, stok, kode]);
+  } else {
+    res = run(`INSERT INTO barang (kode, nama, harga_beli, stok) VALUES (?, ?, ?, ?)`, [kode, nama, harga, Math.max(0, stok)]);
+  }
+
+  if (!res.ok) { modal('❌','Error DB', res.error, [{label:'OK'}]); return; }
+
+  resetFormBarang();
+  renderBarang();
+  renderDropdown();
+  renderKPI();
+}
+
+function editBarang(kode) {
+  const r = query(`SELECT * FROM barang WHERE kode=?`, [kode]);
+  if (!r.ok || !r.rows[0]) return;
+  const b = r.rows[0];
+  document.getElementById('b_kode').value  = b.kode;
+  document.getElementById('b_nama').value  = b.nama;
+  document.getElementById('b_harga').value = b.harga_beli;
+  document.getElementById('b_stok').value  = 0;
+  updateSqlPreviewBarang();
+  switchTab('barang', document.querySelectorAll('.tab')[0]);
+  document.getElementById('b_nama').focus();
+}
+
+function hapusBarang(kode) {
+  modal('🗑','Hapus Barang',`Yakin hapus barang ${kode}?\nData transaksi terkait akan tetap ada.`,[
+    { label:'Batal', cls:'btn-ghost' },
+    { label:'Hapus', cls:'btn-danger', fn: () => {
+      const res = run(`DELETE FROM barang WHERE kode=?`, [kode]);
+      if (!res.ok) { modal('❌','Error',res.error,[{label:'OK'}]); return; }
+      renderBarang(); renderDropdown(); renderKPI();
+    }}
+  ]);
+}
+
+function renderBarang(search = '') {
+  const sql = search
+    ? `SELECT * FROM barang WHERE nama LIKE ? OR kode LIKE ? ORDER BY kode`
+    : `SELECT * FROM barang ORDER BY kode`;
+  const params = search ? [`%${search}%`, `%${search}%`] : [];
+  const r = query(sql, params);
+
+  const tbody = document.getElementById('tblBarang');
+  if (!tbody) return;
+  if (!r.ok || r.rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">Belum ada barang</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = r.rows.map(b => {
+    const badge = b.stok <= 0
+      ? `<span class="badge badge-red">Habis</span>`
+      : b.stok <= 3
+      ? `<span class="badge badge-yellow">Menipis</span>`
+      : `<span class="badge badge-green">OK</span>`;
+    return `<tr>
+      <td><span class="chip">${b.kode}</span></td>
+      <td>${b.nama}</td>
+      <td>${fmt(b.stok)} ${badge}</td>
+      <td>${rp(b.harga_beli)}</td>
+      <td>
+        <button class="btn-ghost btn-sm" onclick="editBarang('${b.kode}')">Edit</button>
+        <button class="btn-danger btn-sm" onclick="hapusBarang('${b.kode}')">Hapus</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  DROPDOWN
+// ═══════════════════════════════════════════════════════
+function renderDropdown() {
+  const r = query(`SELECT kode, nama, stok, harga_beli FROM barang WHERE stok > 0 ORDER BY kode`);
+  const sel = document.getElementById('t_kode');
+  if (!sel) return;
+  sel.innerHTML = r.rows.length === 0
+    ? `<option value="">— Tidak ada stok tersedia —</option>`
+    : r.rows.map(b => `<option value="${b.kode}" data-harga="${b.harga_beli}" data-stok="${b.stok}">${b.kode} - ${b.nama} (stok: ${b.stok})</option>`).join('');
+}
+
+function onBarangSelect() { updateSqlPreviewTransaksi(); }
+
+// ═══════════════════════════════════════════════════════
+//  CART & TRANSAKSI
+// ═══════════════════════════════════════════════════════
+let cart = [];
+
+function addToCart() {
+  const sel   = document.getElementById('t_kode');
+  const kode  = sel.value;
+  const qty   = parseInt(document.getElementById('t_qty').value);
+  const harga = parseFloat(document.getElementById('t_harga').value);
+
+  if (!kode) { modal('⚠️','Pilih Barang','Pilih barang dari dropdown.',[{label:'OK'}]); return; }
+
+  const r = query(`SELECT * FROM barang WHERE kode=?`, [kode]);
+  if (!r.ok || !r.rows[0]) { modal('⚠️','Error','Barang tidak ditemukan.',[{label:'OK'}]); return; }
+  const b = r.rows[0];
+
+  if (b.stok <= 0) {
+    modal('🚫','Stok Habis',`Stok ${b.nama} sudah habis!`,[{label:'OK'}]); return;
+  }
+  if (!qty || qty <= 0) { modal('⚠️','Qty Tidak Valid','Masukkan qty minimal 1.',[{label:'OK'}]); return; }
+  if (!harga || harga <= 0) { modal('⚠️','Harga Tidak Valid','Masukkan harga jual.',[{label:'OK'}]); return; }
+
+  const inCart = cart.filter(c => c.kode === kode).reduce((s,c) => s+c.qty, 0);
+  if (inCart + qty > b.stok) {
+    modal('⚠️','Stok Tidak Cukup',
+      `Stok ${b.nama} hanya ${b.stok}.\nDi cart: ${inCart}, ditambah: ${qty} = ${inCart+qty}`,
+      [{label:'OK'}]); return;
+  }
+
+  cart.push({ kode: b.kode, nama: b.nama, qty, harga, hargaBeli: b.harga_beli });
+  document.getElementById('t_qty').value   = '';
+  document.getElementById('t_harga').value = '';
+  renderCart();
+  updateSqlPreviewTransaksi();
+}
+
+function renderCart() {
+  const tbody = document.getElementById('tblCart');
+  if (!tbody) return;
+  let total = 0;
+  if (cart.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty" style="padding:16px">Cart kosong</td></tr>`;
+  } else {
+    tbody.innerHTML = cart.map((c, i) => {
+      const sub = c.qty * c.harga;
+      total += sub;
+      return `<tr>
+        <td>${c.nama}</td>
+        <td>${c.qty}</td>
+        <td>${rp(c.harga)}</td>
+        <td>${rp(sub)}</td>
+        <td><button class="btn-danger btn-sm" onclick="delItem(${i})">✕</button></td>
+      </tr>`;
+    }).join('');
+    cart.forEach(c => { total; });
+    total = cart.reduce((s,c) => s + c.qty*c.harga, 0);
+  }
+  document.getElementById('cartTotal').textContent = rp(total);
+}
+
+function delItem(i) { cart.splice(i, 1); renderCart(); updateSqlPreviewTransaksi(); }
+function clearCart() {
+  if (!cart.length) return;
+  modal('🗑','Kosongkan Cart','Hapus semua item di cart?',[
+    {label:'Batal', cls:'btn-ghost'},
+    {label:'Kosongkan', cls:'btn-danger', fn: () => { cart=[]; renderCart(); updateSqlPreviewTransaksi(); }}
+  ]);
+}
+
+function updateSqlPreviewTransaksi() {
+  const el = document.getElementById('sqlPreviewTransaksi');
+  if (!el) return;
+  if (cart.length === 0) { el.textContent = '— Tambah item ke cart —'; return; }
+  const tgl = new Date().toLocaleDateString('sv-SE');
+  const lines = cart.map(c =>
+    `INSERT INTO transaksi (tanggal,kode,nama,qty,harga_jual,profit) VALUES ('${tgl}','${c.kode}','${c.nama}',${c.qty},${c.harga},${(c.harga-c.hargaBeli)*c.qty});\nUPDATE barang SET stok=stok-${c.qty} WHERE kode='${c.kode}';`
+  ).join('\n');
+  el.textContent = lines;
+}
+
+function konfirmasiTransaksi() {
+  if (!cart.length) { modal('⚠️','Cart Kosong','Tambahkan barang ke cart.',[{label:'OK'}]); return; }
+  const total    = cart.reduce((s,c) => s+c.qty*c.harga, 0);
+  const ringkasan = cart.map(c => `• ${c.nama} x${c.qty}`).join('\n');
+  modal('🛒','Konfirmasi Transaksi',
+    `${ringkasan}\n\nTotal: ${rp(total)}`,
+    [{label:'Batal', cls:'btn-ghost'}, {label:'✅ Proses', cls:'btn-ok', fn: submitTransaksi}]
+  );
+}
+
+function submitTransaksi() {
+  if (!cart.length) return;
+  const tgl = new Date().toLocaleDateString('sv-SE');
+
+  // Validasi ulang stok
+  for (const c of cart) {
+    const r = query(`SELECT stok, nama FROM barang WHERE kode=?`, [c.kode]);
+    if (!r.ok || !r.rows[0]) { modal('❌','Error',`Barang ${c.kode} tidak ditemukan.`,[{label:'OK'}]); return; }
+    const b = r.rows[0];
+    if (b.stok < c.qty) {
+      modal('⚠️','Stok Tidak Cukup',`${b.nama}: stok tersisa ${b.stok}, dibutuhkan ${c.qty}`,[{label:'OK'}]); return;
+    }
+  }
+
+  // Jalankan transaksi SQL
+  try {
+    DB.run('BEGIN TRANSACTION');
+    cart.forEach(c => {
+      DB.run(
+        `INSERT INTO transaksi (tanggal,kode,nama,qty,harga_jual,profit) VALUES (?,?,?,?,?,?)`,
+        [tgl, c.kode, c.nama, c.qty, c.harga, (c.harga - c.hargaBeli) * c.qty]
+      );
+      DB.run(`UPDATE barang SET stok = stok - ? WHERE kode = ?`, [c.qty, c.kode]);
+    });
+    DB.run('COMMIT');
+    saveDB();
+  } catch(e) {
+    DB.run('ROLLBACK');
+    modal('❌','Transaksi Gagal', e.message, [{label:'OK'}]);
+    return;
+  }
+
+  const habis = cart.filter(c => {
+    const r = query(`SELECT stok FROM barang WHERE kode=?`,[c.kode]);
+    return r.rows[0]?.stok <= 0;
+  });
+
+  cart = [];
+  renderCart();
+  renderBarang();
+  renderDropdown();
+  renderTransaksi();
+  renderKPI();
+  updateSqlPreviewTransaksi();
+
+  if (habis.length) {
+    modal('⚠️','Transaksi Berhasil',
+      `Stok berhasil diperbarui.\n\nStok habis:\n${habis.map(c=>`• ${c.nama}`).join('\n')}`,
+      [{label:'OK'}]
+    );
+  } else {
+    modal('✅','Transaksi Berhasil','Data tersimpan ke SQLite.',[{label:'OK'}]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  RIWAYAT TRANSAKSI
+// ═══════════════════════════════════════════════════════
+function renderTransaksi() {
+  const from  = document.getElementById('f_from')?.value;
+  const to    = document.getElementById('f_to')?.value;
+  let sql     = `SELECT * FROM transaksi`;
+  const params = [];
+  if (from && to) { sql += ` WHERE tanggal BETWEEN ? AND ?`; params.push(from, to); }
+  else if (from)  { sql += ` WHERE tanggal >= ?`; params.push(from); }
+  else if (to)    { sql += ` WHERE tanggal <= ?`; params.push(to); }
+  sql += ` ORDER BY id DESC`;
+
+  const r = query(sql, params);
+  const tbody = document.getElementById('tblTransaksi');
+  if (!tbody) return;
+  if (!r.ok || r.rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">Belum ada transaksi</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = r.rows.map(t => `
+    <tr>
+      <td>${t.tanggal}</td>
+      <td><span class="chip">${t.kode}</span></td>
+      <td>${t.nama}</td>
+      <td>${t.qty}</td>
+      <td>${rp(t.harga_jual)}</td>
+      <td class="${t.profit >= 0 ? 'profit-pos' : 'profit-neg'}">${rp(t.profit)}</td>
+      <td><button class="btn-danger btn-sm" onclick="hapusTransaksi(${t.id},'${t.kode}',${t.qty})">Hapus</button></td>
+    </tr>`).join('');
+}
+
+function hapusTransaksi(id, kode, qty) {
+  modal('🗑','Hapus Transaksi',`Hapus transaksi ini?\nStok ${kode} akan dikembalikan +${qty}`, [
+    {label:'Batal', cls:'btn-ghost'},
+    {label:'Hapus', cls:'btn-danger', fn: () => {
+      try {
+        DB.run('BEGIN TRANSACTION');
+        DB.run(`DELETE FROM transaksi WHERE id=?`, [id]);
+        DB.run(`UPDATE barang SET stok=stok+? WHERE kode=?`, [qty, kode]);
+        DB.run('COMMIT');
+        saveDB();
+      } catch(e) {
+        DB.run('ROLLBACK');
+        modal('❌','Error',e.message,[{label:'OK'}]); return;
+      }
+      renderTransaksi(); renderBarang(); renderDropdown(); renderKPI();
+    }}
+  ]);
+}
+
+// ═══════════════════════════════════════════════════════
+//  LAPORAN
+// ═══════════════════════════════════════════════════════
+function renderLaporan() {
+  const from = document.getElementById('lp_from').value;
+  const to   = document.getElementById('lp_to').value;
+  const params = [];
+  let where = '';
+  if (from && to) { where = `WHERE t.tanggal BETWEEN ? AND ?`; params.push(from, to); }
+
+  const rSum = query(`SELECT COUNT(*) as cnt, SUM(qty) as total_qty, SUM(harga_jual*qty) as omzet, SUM(profit) as profit FROM transaksi t ${where}`, params);
+  const rTop = query(`SELECT kode, nama, SUM(qty) as terjual, SUM(profit) as profit FROM transaksi t ${where} GROUP BY kode ORDER BY terjual DESC LIMIT 5`, params);
+  const rHari = query(`SELECT tanggal, SUM(harga_jual*qty) as omzet, SUM(profit) as profit FROM transaksi t ${where} GROUP BY tanggal ORDER BY tanggal DESC LIMIT 7`, params);
+
+  const s = rSum.rows[0] || {};
+  document.getElementById('laporanBody').innerHTML = `
+    <div class="kpi-row" style="margin-bottom:20px">
+      <div class="kpi-card"><div class="kpi-label">Transaksi</div><div class="kpi-value">${fmt(s.cnt||0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Qty</div><div class="kpi-value">${fmt(s.total_qty||0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Omzet</div><div class="kpi-value blue">${rp(s.omzet||0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Profit</div><div class="kpi-value green">${rp(s.profit||0)}</div></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="card-title" style="margin-bottom:10px">🏆 Top 5 Barang Terlaris</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Barang</th><th>Terjual</th><th>Profit</th></tr></thead>
+            <tbody>
+              ${rTop.rows.length === 0
+                ? `<tr><td colspan="4" class="empty">Tidak ada data</td></tr>`
+                : rTop.rows.map((r,i) => `<tr>
+                    <td>${i+1}</td>
+                    <td>${r.nama}<br><span style="color:var(--muted);font-size:11px">${r.kode}</span></td>
+                    <td>${fmt(r.terjual)}</td>
+                    <td class="profit-pos">${rp(r.profit)}</td>
+                  </tr>`).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="card-title" style="margin-bottom:10px">📅 Penjualan per Hari (7 Hari Terakhir)</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Tanggal</th><th>Omzet</th><th>Profit</th></tr></thead>
+            <tbody>
+              ${rHari.rows.length === 0
+                ? `<tr><td colspan="3" class="empty">Tidak ada data</td></tr>`
+                : rHari.rows.map(r => `<tr>
+                    <td>${r.tanggal}</td>
+                    <td>${rp(r.omzet)}</td>
+                    <td class="${r.profit>=0?'profit-pos':'profit-neg'}">${rp(r.profit)}</td>
+                  </tr>`).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SQL yang dipakai -->
+    <hr class="divider" style="margin-top:20px">
+    <div class="card-title" style="margin-bottom:8px">SQL yang dieksekusi</div>
+    <div class="sql-result" style="color:var(--muted);font-size:11px">SELECT COUNT(*) as cnt, SUM(qty) as total_qty, SUM(harga_jual*qty) as omzet, SUM(profit) as profit FROM transaksi${where?' '+where:''};
+
+SELECT kode, nama, SUM(qty) as terjual, SUM(profit) as profit FROM transaksi${where?' '+where:''} GROUP BY kode ORDER BY terjual DESC LIMIT 5;
+
+SELECT tanggal, SUM(harga_jual*qty) as omzet, SUM(profit) as profit FROM transaksi${where?' '+where:''} GROUP BY tanggal ORDER BY tanggal DESC LIMIT 7;</div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SQL CONSOLE
+// ═══════════════════════════════════════════════════════
+function setSqlTemplate(sql) {
+  document.getElementById('sqlInput').value = sql;
+}
+
+function runSQL() {
+  const sql = document.getElementById('sqlInput').value.trim();
+  const el  = document.getElementById('sqlResult');
+  if (!sql) return;
+
+  // Blokir perintah berbahaya dari console (sudah ada proteksi karena ini local, tapi tetap info user)
+  const upper = sql.toUpperCase();
+  if (upper.startsWith('DROP') || upper.startsWith('DELETE') || upper.startsWith('UPDATE')) {
+    modal('⚠️','Konfirmasi','Query ini akan mengubah data. Lanjutkan?',[
+      {label:'Batal', cls:'btn-ghost'},
+      {label:'Jalankan', cls:'btn-danger', fn: () => execSQL(sql, el)}
+    ]);
+    return;
+  }
+
+  execSQL(sql, el);
+}
+
+function execSQL(sql, el) {
+  try {
+    const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
+    if (isSelect) {
+      const r = query(sql);
+      if (!r.ok) throw new Error(r.error);
+      if (r.rows.length === 0) { el.className = 'sql-result'; el.textContent = '(0 rows)'; return; }
+      const cols = Object.keys(r.rows[0]);
+      const header = cols.join('\t');
+      const divider = cols.map(c => '-'.repeat(c.length + 4)).join('\t');
+      const rows = r.rows.map(row => cols.map(c => row[c] ?? 'NULL').join('\t')).join('\n');
+      el.className = 'sql-result';
+      el.textContent = `${header}\n${divider}\n${rows}\n\n(${r.rows.length} rows)`;
+    } else {
+      DB.run(sql);
+      saveDB();
+      el.className = 'sql-result';
+      el.textContent = 'OK — Query berhasil dieksekusi.';
+      renderBarang(); renderTransaksi(); renderKPI(); renderDropdown();
+    }
+  } catch(e) {
+    el.className = 'sql-result error';
+    el.textContent = 'ERROR: ' + e.message;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT / IMPORT / RESET
+// ═══════════════════════════════════════════════════════
+function exportDB() {
+  const bin  = DB.export();
+  const blob = new Blob([bin], { type: 'application/octet-stream' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `penjualan_${new Date().toLocaleDateString('sv-SE')}.db`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importDB() { document.getElementById('importFile').click(); }
+
+async function doImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}` });
+  DB = new SQL.Database(new Uint8Array(buf));
+  saveDB();
+  renderBarang(); renderTransaksi(); renderKPI(); renderDropdown();
+  modal('✅','Import Berhasil',`Database "${file.name}" berhasil dimuat.`,[{label:'OK'}]);
+}
+
+function exportCSV() {
+  const r = query(`SELECT * FROM transaksi ORDER BY id`);
+  if (!r.ok || r.rows.length === 0) { modal('⚠️','Kosong','Belum ada transaksi.',[{label:'OK'}]); return; }
+  const cols = ['id','tanggal','kode','nama','qty','harga_jual','profit'];
+  const csv  = [cols.join(','), ...r.rows.map(t => cols.map(c => t[c]).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `transaksi_${new Date().toLocaleDateString('sv-SE')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function confirmReset() {
+  modal('🚨','Reset Semua Data',
+    'Semua data barang dan transaksi akan dihapus permanen.\nTidak bisa dibatalkan!',
+    [
+      {label:'Batal', cls:'btn-ghost'},
+      {label:'Hapus Semua', cls:'btn-danger', fn: () => {
+        DB.run('DELETE FROM transaksi');
+        DB.run('DELETE FROM barang');
+        saveDB();
+        renderBarang(); renderTransaksi(); renderKPI(); renderDropdown();
+        modal('✅','Selesai','Semua data telah dihapus.',[{label:'OK'}]);
+      }}
+    ]
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+initSQLite().catch(e => {
+  document.getElementById('mainArea').innerHTML =
+    `<div class="loading" style="color:var(--danger)">❌ Gagal memuat SQLite: ${e.message}</div>`;
+});
+</script>
+</body>
+</html>
