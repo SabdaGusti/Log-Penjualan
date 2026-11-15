@@ -3,6 +3,7 @@
 Aplikasi pencatatan penjualan sederhana yang berjalan sepenuhnya di browser
 dalam satu file HTML, tanpa backend dan tanpa instalasi. Data disimpan di
 database SQLite (sql.js / WebAssembly) dan tersimpan secara lokal di browser. 
+
 https://sabdagusti.github.io/Log-Penjualan/
 
 <p align=center>
